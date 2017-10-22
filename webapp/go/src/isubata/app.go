@@ -130,6 +130,25 @@ func queryMessages(chanID, lastID int64) ([]Message, error) {
 	return msgs, err
 }
 
+type MessageWithUser struct {
+	ID        int64     `db:"id"`
+	ChannelID int64     `db:"channel_id"`
+	UserID    int64     `db:"user_id"`
+	Content   string    `db:"content"`
+	CreatedAt time.Time `db:"created_at"`
+	Sequence  int64     `db:"sequence"`
+	Name      string    `db:"name"`
+	DisplayName      string    `db:"display_name"`
+	AvatarIcon      string    `db:"avatar_icon"`
+}
+
+func queryMessagesWithUser(chanID, lastID int64) ([]MessageWithUser, error) {
+	msgs := []MessageWithUser{}
+	err := db.Select(&msgs, "SELECT m.id, m.channel_id, m.user_id, m.content, m.created_at, m.sequence, u.name, u.display_name, u.avatar_icon FROM message as m, user as u WHERE m.id > 1 AND m.channel_id = 1 AND u.id = m.`user_id` ORDER BY m.id DESC LIMIT 100",
+		lastID, chanID)
+	return msgs, err
+}
+
 func sessUserID(c echo.Context) int64 {
 	sess, _ := session.Get("session", c)
 	var userID int64
@@ -367,6 +386,20 @@ func jsonifyMessage(m Message) (map[string]interface{}, error) {
 	return r, nil
 }
 
+func jsonifyMessageWithUserInfo(m MessageWithUser) (map[string]interface{}, error) {
+	u := User{}
+	u.Name = m.Name
+	u.DisplayName = m.DisplayName
+	u.AvatarIcon = m.AvatarIcon
+
+	r := make(map[string]interface{})
+	r["id"] = m.ID
+	r["user"] = u
+	r["date"] = m.CreatedAt.Format("2006/01/02 15:04:05")
+	r["content"] = m.Content
+	return r, nil
+}
+
 func getMessage(c echo.Context) error {
 	userID := sessUserID(c)
 	if userID == 0 {
@@ -382,7 +415,7 @@ func getMessage(c echo.Context) error {
 		return err
 	}
 
-	messages, err := queryMessages(chanID, lastID)
+	messages, err := queryMessagesWithUser(chanID, lastID)
 	if err != nil {
 		return err
 	}
@@ -390,7 +423,7 @@ func getMessage(c echo.Context) error {
 	response := make([]map[string]interface{}, 0)
 	for i := len(messages) - 1; i >= 0; i-- {
 		m := messages[i]
-		r, err := jsonifyMessage(m)
+		r, err := jsonifyMessageWithUserInfo(m)
 		if err != nil {
 			return err
 		}
