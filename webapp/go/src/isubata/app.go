@@ -797,7 +797,7 @@ func getIcon(c echo.Context) error {
 		return echo.ErrNotFound
 	}
 	c.Response().Header().Set(echo.HeaderLastModified, "Thu, 11 May 2010 16:00:00 GMT")
-	c.Response().Header().Set(echo.HeaderETag, name)
+	c.Response().Header().Set("ETag", name)
 	return c.Blob(http.StatusOK, mime, data)
 }
 
