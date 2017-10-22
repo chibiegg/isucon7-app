@@ -452,7 +452,7 @@ func queryHaveReadMap(userID int64) (map[int64]int64, error) {
 
 	err := db.Select(
 		&sequences,
-		"SELECT m.id AS channel_id, m.sequence FROM haveread as h, message as m WHERE h.user_id = ? AND m.id = h.message_id",
+		"SELECT m.channel_id AS channel_id, m.sequence FROM haveread as h, message as m WHERE h.user_id = ? AND m.id = h.message_id",
 		userID,
 	)
 
