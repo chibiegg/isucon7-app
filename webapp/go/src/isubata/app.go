@@ -626,10 +626,20 @@ func getHistory(c echo.Context) error {
 
 	const N = 20
 	var cnt int64
+	/*
 	err = db.Get(&cnt, "SELECT COUNT(*) as cnt FROM message WHERE channel_id = ?", chID)
 	if err != nil {
 		return err
 	}
+	*/
+
+	messageMutex.RLock()
+	cnt, ok := sequenceMap[chID]
+	messageMutex.RUnlock()
+	if !ok {
+		cnt = 0
+	}
+
 	maxPage := int64(cnt+N-1) / N
 	if maxPage == 0 {
 		maxPage = 1
