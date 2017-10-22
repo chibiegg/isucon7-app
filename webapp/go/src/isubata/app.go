@@ -797,10 +797,20 @@ func postProfile(c echo.Context) error {
 	}
 
 	if avatarName != "" && len(avatarData) > 0 {
+		/*
 		_, err := db.Exec("INSERT INTO image (name, data) VALUES (?, ?)", avatarName, avatarData)
 		if err != nil {
 			return err
 		}
+		*/
+		filename := fmt.Sprintf("icons/%s", avatarName)
+		f, err := os.Create(filename)
+		if err != nil {
+			return err
+		}
+		f.Write(avatarData)
+		f.Close()
+
 		_, err = db.Exec("UPDATE user SET avatar_icon = ? WHERE id = ?", avatarName, self.ID)
 		if err != nil {
 			return err
@@ -820,11 +830,20 @@ func postProfile(c echo.Context) error {
 func getIcon(c echo.Context) error {
 	var name string
 	var data []byte
+	/*
 	err := db.QueryRow("SELECT name, data FROM image WHERE name = ?",
 		c.Param("file_name")).Scan(&name, &data)
 	if err == sql.ErrNoRows {
 		return echo.ErrNotFound
 	}
+	if err != nil {
+		return err
+	}
+	*/
+
+	name = c.Param("file_name")
+	filename := fmt.Sprintf("icons/%s", name)
+	data, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return err
 	}
