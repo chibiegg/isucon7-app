@@ -532,6 +532,7 @@ func fetchUnread(c echo.Context) error {
 		}
 
 
+		/*
 		lastID, err := queryHaveRead(userID, chID)
 		if err != nil {
 			return err
@@ -550,6 +551,7 @@ func fetchUnread(c echo.Context) error {
 		if err != nil {
 			return err
 		}
+		*/
 		/*
 		r := map[string]interface{}{
 			"channel_id": chID,
@@ -559,7 +561,6 @@ func fetchUnread(c echo.Context) error {
 		r := map[string]interface{} {
 			"channel_id": chID,
 			"unread": unread,
-			"corret_unread": cnt,
 		}
 
 
