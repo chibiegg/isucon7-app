@@ -123,13 +123,6 @@ type Message struct {
 	Sequence  int64     `db:"sequence"`
 }
 
-func queryMessages(chanID, lastID int64) ([]Message, error) {
-	msgs := []Message{}
-	err := db.Select(&msgs, "SELECT * FROM message WHERE id > ? AND channel_id = ? ORDER BY id DESC LIMIT 100",
-		lastID, chanID)
-	return msgs, err
-}
-
 type MessageWithUser struct {
 	ID        int64     `db:"id"`
 	ChannelID int64     `db:"channel_id"`
@@ -370,22 +363,6 @@ func postMessage(c echo.Context) error {
 	return c.NoContent(204)
 }
 
-func jsonifyMessage(m Message) (map[string]interface{}, error) {
-	u := User{}
-	err := db.Get(&u, "SELECT name, display_name, avatar_icon FROM user WHERE id = ?",
-		m.UserID)
-	if err != nil {
-		return nil, err
-	}
-
-	r := make(map[string]interface{})
-	r["id"] = m.ID
-	r["user"] = u
-	r["date"] = m.CreatedAt.Format("2006/01/02 15:04:05")
-	r["content"] = m.Content
-	return r, nil
-}
-
 func jsonifyMessageWithUserInfo(m MessageWithUser) (map[string]interface{}, error) {
 	u := User{}
 	u.Name = m.Name
@@ -549,9 +526,11 @@ func getHistory(c echo.Context) error {
 		return ErrBadReqeust
 	}
 
-	messages := []Message{}
+	// todo: fetch user info with messages
+	messages := []MessageWithUser{}
 	err = db.Select(&messages,
-		"SELECT * FROM message WHERE channel_id = ? ORDER BY id DESC LIMIT ? OFFSET ?",
+		"SELECT m.id, m.channel_id, m.user_id, m.content, m.created_at, m.sequence, u.name, u.display_name, u.avatar_icon FROM message as m, user as u"+
+			"WHERE m.channel_id = ? ORDER BY m.id DESC LIMIT ? OFFSET ?",
 		chID, N, (page-1)*N)
 	if err != nil {
 		return err
@@ -559,7 +538,7 @@ func getHistory(c echo.Context) error {
 
 	mjson := make([]map[string]interface{}, 0)
 	for i := len(messages) - 1; i >= 0; i-- {
-		r, err := jsonifyMessage(messages[i])
+		r, err := jsonifyMessageWithUserInfo(messages[i])
 		if err != nil {
 			return err
 		}
