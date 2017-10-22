@@ -33,7 +33,8 @@ const (
 var (
 	db            *sqlx.DB
 	ErrBadReqeust = echo.NewHTTPError(http.StatusBadRequest)
-	messageMutex = &sync.Mutex{}
+	messageMutex = &sync.RWMutex{}
+	sequenceMap = make(map[int64]int64)
 )
 
 type Renderer struct {
@@ -111,10 +112,17 @@ func getUser(userID int64) (*User, error) {
 
 func addMessage(channelID, userID int64, content string) (int64, error) {
 	messageMutex.Lock()
-	res, err := db.Exec(
-		"INSERT INTO message (channel_id, user_id, content, created_at, sequence) VALUES (?, ?, ?, NOW(), (SELECT IFNULL(MAX(m2.sequence),0)+1 FROM message m2 WHERE m2.channel_id = ?))",
-		channelID, userID, content, channelID)
+	seq, ok := sequenceMap[channelID]
+	if ok {
+		seq = seq + 1
+	}else{
+		seq = 1
+	}
+	sequenceMap[channelID] = seq
 	messageMutex.Unlock()
+	res, err := db.Exec(
+		"INSERT INTO message (channel_id, user_id, content, created_at, sequence) VALUES (?, ?, ?, NOW(), ?)",
+		channelID, userID, content, seq)
 	if err != nil {
 		return 0, err
 	}
@@ -228,6 +236,9 @@ func getInitialize(c echo.Context) error {
 	db.MustExec("DELETE FROM channel WHERE id > 10")
 	db.MustExec("DELETE FROM message WHERE id > 10000")
 	db.MustExec("DELETE FROM haveread")
+
+	sequenceMap, _ = queryChannelSequenceMap()
+
 	return c.String(204, "")
 }
 
@@ -523,10 +534,14 @@ func fetchUnread(c echo.Context) error {
 		return err
 	}
 
+	/*
 	channelSqeunqcesMap, err := queryChannelSequenceMap()
 	if err != nil {
 		return err
 	}
+	*/
+
+	channelSqeunqcesMap := sequenceMap
 
 	haveReadMap, err := queryHaveReadMap(userID)
 	if err != nil {
