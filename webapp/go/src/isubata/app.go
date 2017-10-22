@@ -106,8 +106,8 @@ func getUser(userID int64) (*User, error) {
 
 func addMessage(channelID, userID int64, content string) (int64, error) {
 	res, err := db.Exec(
-		"INSERT INTO message (channel_id, user_id, content, created_at) VALUES (?, ?, ?, NOW())",
-		channelID, userID, content)
+		"INSERT INTO message (channel_id, user_id, content, created_at, sequence) VALUES (?, ?, ?, NOW(), (SELECT MAX(m2.sequence)+1 FROM message m2 WHERE m2.channel_id = ?))",
+		channelID, userID, content, channelID)
 	if err != nil {
 		return 0, err
 	}
@@ -120,6 +120,7 @@ type Message struct {
 	UserID    int64     `db:"user_id"`
 	Content   string    `db:"content"`
 	CreatedAt time.Time `db:"created_at"`
+	Sequence  int64     `db:"sequence"`
 }
 
 func queryMessages(chanID, lastID int64) ([]Message, error) {
