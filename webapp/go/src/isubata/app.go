@@ -49,7 +49,7 @@ func init() {
 
 	db_host := os.Getenv("ISUBATA_DB_HOST")
 	if db_host == "" {
-		db_host = "127.0.0.1"
+		db_host = "59.106.209.116"
 	}
 	db_port := os.Getenv("ISUBATA_DB_PORT")
 	if db_port == "" {
@@ -57,9 +57,12 @@ func init() {
 	}
 	db_user := os.Getenv("ISUBATA_DB_USER")
 	if db_user == "" {
-		db_user = "root"
+		db_user = "isucon"
 	}
 	db_password := os.Getenv("ISUBATA_DB_PASSWORD")
+	if db_password == "" {
+		db_password = "isucon"
+	}
 	if db_password != "" {
 		db_password = ":" + db_password
 	}
@@ -137,7 +140,7 @@ type MessageWithUser struct {
 
 func queryMessagesWithUser(chanID, lastID int64) ([]MessageWithUser, error) {
 	msgs := []MessageWithUser{}
-	err := db.Select(&msgs, "SELECT m.id, m.channel_id, m.user_id, m.content, m.created_at, m.sequence, u.name, u.display_name, u.avatar_icon FROM message as m, user as u WHERE m.id > 1 AND m.channel_id = 1 AND u.id = m.`user_id` ORDER BY m.id DESC LIMIT 100",
+	err := db.Select(&msgs, "SELECT m.id, m.channel_id, m.user_id, m.content, m.created_at, m.sequence, u.name, u.display_name, u.avatar_icon FROM message as m, user as u WHERE m.id > ? AND m.channel_id = ? AND u.id = m.`user_id` ORDER BY m.id DESC LIMIT 100",
 		lastID, chanID)
 	return msgs, err
 }
