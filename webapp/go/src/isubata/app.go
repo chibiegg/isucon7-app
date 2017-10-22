@@ -416,6 +416,62 @@ func queryChannels() ([]int64, error) {
 	return res, err
 }
 
+func queryChannelSequenceMap() (map[int64]int64, error) {
+
+	type ChannelSequence struct {
+	  ChannelID int64  `db:"channel_id"`
+	  Sequence  int64  `db:"sequence"`
+	}
+
+	sequences := []ChannelSequence{}
+
+	err := db.Select(&sequences, "SELECT channel_id, MAX(sequence) AS sequence FROM message GROUP BY channel_id")
+
+	if err != nil {
+			return nil, err
+	}
+
+	ret := make(map[int64]int64)
+
+	for _, seq := range sequences {
+		ret[seq.ChannelID] = seq.Sequence
+	}
+
+	return ret, nil
+}
+
+
+func queryHaveReadMap(userID int64) (map[int64]int64, error) {
+
+	type ChannelSequence struct {
+	  ChannelID int64  `db:"channel_id"`
+	  Sequence  int64  `db:"sequence"`
+	}
+
+	sequences := []ChannelSequence{}
+
+	err := db.Select(
+		&sequences,
+		"SELECT m.id, m.content, h.message_id, m.sequence FROM haveread as h, message as m WHERE h.user_id = ? AND m.id = h.message_id",
+		userID,
+	)
+
+	if err != nil {
+			return nil, err
+	}
+
+	ret := make(map[int64]int64)
+
+	for _, seq := range sequences {
+		ret[seq.ChannelID] = seq.Sequence
+	}
+
+	return ret, nil
+}
+
+
+
+
 func queryHaveRead(userID, chID int64) (int64, error) {
 	type HaveRead struct {
 		UserID    int64     `db:"user_id"`
@@ -450,9 +506,37 @@ func fetchUnread(c echo.Context) error {
 		return err
 	}
 
+	channelSqeunqcesMap, err := queryChannelSequenceMap()
+	if err != nil {
+		return err
+	}
+
+	haveReadMap, err := queryHaveReadMap(userID)
+	if err != nil {
+		return err
+	}
+
+
 	resp := []map[string]interface{}{}
 
 	for _, chID := range channels {
+
+		unread, ok := channelSqeunqcesMap[chID]
+		if ok {
+			haveread, ok := haveReadMap[chID]
+			if ok {
+				unread -= haveread
+			}
+		} else {
+			unread = 0
+		}
+
+		r := map[string]interface{} {
+			"channel_id": chID,
+			"unread": unread,
+		}
+
+		/*
 		lastID, err := queryHaveRead(userID, chID)
 		if err != nil {
 			return err
@@ -474,6 +558,8 @@ func fetchUnread(c echo.Context) error {
 		r := map[string]interface{}{
 			"channel_id": chID,
 			"unread":     cnt}
+		*/
+
 		resp = append(resp, r)
 	}
 
