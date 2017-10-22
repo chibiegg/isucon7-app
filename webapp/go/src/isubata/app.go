@@ -49,7 +49,7 @@ func init() {
 
 	db_host := os.Getenv("ISUBATA_DB_HOST")
 	if db_host == "" {
-		db_host = "127.0.0.1"
+		db_host = "59.106.209.116"
 	}
 	db_port := os.Getenv("ISUBATA_DB_PORT")
 	if db_port == "" {
@@ -57,9 +57,12 @@ func init() {
 	}
 	db_user := os.Getenv("ISUBATA_DB_USER")
 	if db_user == "" {
-		db_user = "root"
+		db_user = "isucon"
 	}
 	db_password := os.Getenv("ISUBATA_DB_PASSWORD")
+	if db_password == "" {
+		db_password = "isucon"
+	}
 	if db_password != "" {
 		db_password = ":" + db_password
 	}
@@ -123,9 +126,21 @@ type Message struct {
 	Sequence  int64     `db:"sequence"`
 }
 
-func queryMessages(chanID, lastID int64) ([]Message, error) {
-	msgs := []Message{}
-	err := db.Select(&msgs, "SELECT * FROM message WHERE id > ? AND channel_id = ? ORDER BY id DESC LIMIT 100",
+type MessageWithUser struct {
+	ID        int64     `db:"id"`
+	ChannelID int64     `db:"channel_id"`
+	UserID    int64     `db:"user_id"`
+	Content   string    `db:"content"`
+	CreatedAt time.Time `db:"created_at"`
+	Sequence  int64     `db:"sequence"`
+	Name      string    `db:"name"`
+	DisplayName      string    `db:"display_name"`
+	AvatarIcon      string    `db:"avatar_icon"`
+}
+
+func queryMessagesWithUser(chanID, lastID int64) ([]MessageWithUser, error) {
+	msgs := []MessageWithUser{}
+	err := db.Select(&msgs, "SELECT m.id, m.channel_id, m.user_id, m.content, m.created_at, m.sequence, u.name, u.display_name, u.avatar_icon FROM message as m, user as u WHERE m.id > ? AND m.channel_id = ? AND u.id = m.`user_id` ORDER BY m.id DESC LIMIT 100",
 		lastID, chanID)
 	return msgs, err
 }
@@ -351,13 +366,11 @@ func postMessage(c echo.Context) error {
 	return c.NoContent(204)
 }
 
-func jsonifyMessage(m Message) (map[string]interface{}, error) {
+func jsonifyMessageWithUserInfo(m MessageWithUser) (map[string]interface{}, error) {
 	u := User{}
-	err := db.Get(&u, "SELECT name, display_name, avatar_icon FROM user WHERE id = ?",
-		m.UserID)
-	if err != nil {
-		return nil, err
-	}
+	u.Name = m.Name
+	u.DisplayName = m.DisplayName
+	u.AvatarIcon = m.AvatarIcon
 
 	r := make(map[string]interface{})
 	r["id"] = m.ID
@@ -382,7 +395,7 @@ func getMessage(c echo.Context) error {
 		return err
 	}
 
-	messages, err := queryMessages(chanID, lastID)
+	messages, err := queryMessagesWithUser(chanID, lastID)
 	if err != nil {
 		return err
 	}
@@ -390,7 +403,7 @@ func getMessage(c echo.Context) error {
 	response := make([]map[string]interface{}, 0)
 	for i := len(messages) - 1; i >= 0; i-- {
 		m := messages[i]
-		r, err := jsonifyMessage(m)
+		r, err := jsonifyMessageWithUserInfo(m)
 		if err != nil {
 			return err
 		}
@@ -606,9 +619,11 @@ func getHistory(c echo.Context) error {
 		return ErrBadReqeust
 	}
 
-	messages := []Message{}
+	// todo: fetch user info with messages
+	messages := []MessageWithUser{}
 	err = db.Select(&messages,
-		"SELECT * FROM message WHERE channel_id = ? ORDER BY id DESC LIMIT ? OFFSET ?",
+		"SELECT m.id, m.channel_id, m.user_id, m.content, m.created_at, m.sequence, u.name, u.display_name, u.avatar_icon FROM message as m, user as u "+
+			"WHERE m.channel_id = ? AND m.user_id = u.id ORDER BY m.id DESC LIMIT ? OFFSET ?",
 		chID, N, (page-1)*N)
 	if err != nil {
 		return err
@@ -616,7 +631,7 @@ func getHistory(c echo.Context) error {
 
 	mjson := make([]map[string]interface{}, 0)
 	for i := len(messages) - 1; i >= 0; i-- {
-		r, err := jsonifyMessage(messages[i])
+		r, err := jsonifyMessageWithUserInfo(messages[i])
 		if err != nil {
 			return err
 		}
